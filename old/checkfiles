@@ -1,0 +1,85 @@
+#!/bin/bash
+
+FILES=()
+while read filename; do
+  extension="${filename##*.}"
+  if [[ $extension == "py" && -f $filename ]]; then
+    echo "Will process file: $filename"
+    FILES+=($filename)
+  fi
+done
+
+echo "======== Checking Import module convention in modified files ========"
+
+RES=true
+for filename in ${FILES[@]}; do
+  python scripts/checkimports.py $filename
+  if [[ $? != 0 ]]; then
+    RES=false
+  fi
+done
+
+if [[ $RES == false ]]; then
+  echo "========================= Error found !!! ==========================="
+else
+  echo "========================== No error found ==========================="
+fi
+
+echo "============================== Auto pep8 =============================="
+
+RES=true
+for filename in ${FILES[@]}; do
+  if [[ -f .pep8-permissive ]]; then
+    LINEWIDTH=$(grep -E "max-line-length" .pep8-permissive | cut -d'=' -f 2)
+    IGNORES=$(grep -E "ignore" .pep8-permissive | cut -d'=' -f 2 | sed "s/ //g")
+    autopep8 --aggressive --verbose --in-place --max-line-length=$LINEWIDTH --ignore=$IGNORES $filename
+  else
+    echo "No .pep8-permissive found. Discard"
+  fi
+done
+echo "=========================== autopep8 done ============================="
+
+echo "=============================== Pep8 =================================="
+
+RES=true
+if [[ -f .pep8-permissive ]]; then
+  for filename in ${FILES[@]}; do
+    pep8 --config=.pep8-permissive $filename
+  done
+else
+  echo "No .pep8-permissive found. Discard"
+fi
+echo "============================= Pep8 done ==============================="
+
+echo "========================== Permissive Pylint =========================="
+
+RES=true
+if [[ -f .pylintrc-permissive ]]; then
+  for filename in ${FILES[@]}; do
+    pylint --rcfile=.pylintrc-permissive --disable=R,line-too-long --enable=W0611 --output-format=text --report=no $filename
+  done
+else
+  echo "No .pylintrc-permissive found. Discard"
+fi
+echo "============================ No error found ==========================="
+
+if [[ ! -z $BEST_PYTHON_CODER ]]; then
+    echo "========================== Restrictive Pylint =========================="
+    echo "Unset the BEST_PYTHON_CODER environment variable to disable restrive pylint"
+    echo "  e.g.: unset BEST_PYTHON_CODER"
+
+    RES=true
+    if [[ -f .pylintrc-restrictive ]]; then
+      for filename in ${FILES[@]}; do
+        pylint --rcfile=.pylintrc-restrictive --disable=R,line-too-long --enable=W0611 --output-format=text --report=no $filename
+      done
+    else
+      echo "No .pylintrc-restrictive found. Discard"
+    fi
+    echo "============================ No error found ==========================="
+else
+    echo "=================== No Restrictive Pylint executed. ==================="
+    echo "Define the following environment variable to execute it: BEST_PYTHON_CODER"
+    echo "  e.g.: export BEST_PYTHON_CODER=1"
+    echo "============================ No error found ==========================="
+fi

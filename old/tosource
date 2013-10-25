@@ -1,0 +1,23 @@
+#!/bin/bash
+# The tosource file is now separated in two.
+# This file holds the very basic env setup, and should never change
+# because it is not correctly updated by repo.
+# cactus_bootstrap.sh holds the actual logic
+
+if [[ ! -z $BASH_SOURCE ]]; then
+  BASE=$(dirname $BASH_SOURCE)
+elif [[ ! -z $0 ]]; then  # For zsh
+  BASE=$(dirname $0)
+fi
+BASE=$(cd $BASE && pwd)
+PATH=$PATH:$BASE/config/scripts
+
+if [[ ! -d $BASE/.repo ]]; then
+    echo please use tosource file in top directory!
+    false  # script return value != 0
+else
+    # It's really important to keep this line as the last line of this file so the error value
+    # can be safely returned in both sourced and subshell cases.
+    . $BASE/cactus/scripts/cactus_bootstrap.sh
+    setup_bb_env "$@"
+fi
